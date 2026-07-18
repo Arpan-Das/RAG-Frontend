@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // {
 //             id: 3,
@@ -16,57 +16,72 @@ import { useState } from "react";
 function ChatPanel() {
     const [messages, setMessages] = useState([]);
     const [query, setQuery] = useState("");
-    const [id, setId] = useState(0);
-    const [loadSystemMessage, setLoadsystemMessage] = useState(false)
+    
+    const [isWaitingForResponse, SetIsWaitingForResponse] = useState(false)
+    const messagesEndRef = useRef(null);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, [messages, isWaitingForResponse]);
 
     const handelQuery = async () => {
-        console.log(query);  
-        var last_id = id + 1;
+        try {
+            if (query.trim().length > 0) {       
 
-        setMessages(prev => [
-            ...prev,
-            {
-                id: last_id,
-                role : 'user',
-                content: query
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        role: 'user',
+                        content: query
+                    }
+                ]);
+
+                SetIsWaitingForResponse(true);
+
+                const response = await fetch("http://127.0.0.1:8000/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "question": query
+                    })
+                });
+
+                const data = await response.json();
+                
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        content: data.answer,
+                        source: data.sources.join(", ")
+                    }
+                ]);               
+
+                setQuery("");    
             }
-        ]);
 
-        setLoadsystemMessage(true);
-
-        const response = await fetch("http://127.0.0.1:8000/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                "question": query
-            })
-        });  
-        
-        const data = await response.json();
-
-        last_id += 1;
-        setMessages(prev => [
-            ...prev,
-            {
-                id: last_id,
-                role : 'assistant',
-                content: data.answer,
-                source: data.sources.join(", ")
-            }
-        ]);  
-
-        setId(last_id);
-
-        setQuery("");
-        setLoadsystemMessage(false);
+        } catch (err) {
+            // append an error message to the chat, e.g. role: 'assistant', content: "Something went wrong, try again."
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    role: 'assistant',
+                    content: "Something went wrong, try again."
+                }
+            ]);
+            console.log(err);
+        } finally {
+            SetIsWaitingForResponse(false);
+        }
     }
 
-
-
     return (
-        <div className="flex h-full flex-col rounded-[28px] border border-[#e8ddd0] bg-[#fcfaf8] shadow-[0_20px_60px_-24px_rgba(77,57,38,0.28)]">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[#e8ddd0] bg-[#fcfaf8] shadow-[0_20px_60px_-24px_rgba(77,57,38,0.28)]">
             <div className="flex items-center justify-between border-b border-[#efe4d8] px-6 py-5">
                 <div>
                     <h2 className="text-lg font-semibold text-[#2f241c]">Ask about your documents</h2>
@@ -99,7 +114,7 @@ function ChatPanel() {
                 ))}
 
                 {
-                    loadSystemMessage && 
+                    isWaitingForResponse &&
                     <div className="flex justify-start">
                         <div className="rounded-2xl bg-[#f2e7db] px-4 py-3 shadow-sm">
                             <div className="flex items-center gap-2">
@@ -110,23 +125,25 @@ function ChatPanel() {
                         </div>
                     </div>
                 }
+                <div ref={messagesEndRef} />
             </div>
 
             <div className="border-t border-[#efe4d8] bg-[#fcfaf8] p-4">
                 <form
                     className="flex items-center gap-3 rounded-2xl border border-[#e3d5c2] bg-[#fffdfb] px-3 py-2 shadow-sm"
-                    onSubmit={(event) => event.preventDefault()}
+                    onSubmit={(event) => {event.preventDefault(); handelQuery();}}
                 >
                     <input
                         type="text"
+                        disabled={isWaitingForResponse}
                         placeholder="Ask a question about your documents"
                         className="flex-1 border-none bg-transparent px-2 py-2 text-sm text-[#2f241c] outline-none placeholder:text-[#9b8677]"
-                        value = {query}
-                        onChange={(e) => {setQuery(e.target.value)}}
+                        value={query}
+                        onChange={(e) => { setQuery(e.target.value) }}
                     />
                     <button
                         type="submit"
-                        onClick={() => handelQuery()}
+                        disabled={isWaitingForResponse || !query.trim()}                      
                         className="rounded-xl bg-[#5f4b3b] px-4 py-2 text-sm font-semibold text-[#fef8f2] transition hover:bg-[#49392d]"
                     >
                         Send

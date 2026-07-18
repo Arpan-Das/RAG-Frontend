@@ -23,44 +23,81 @@ const badgeStyles = {
 function DocumentPanel() {
     const [documents, setDocuments] = useState([]);
     const [files, setFiles] = useState([]);
-    const [refreshDocuments, setRefreshDocuments] = useState(false);
     const fileInputRef = useRef(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const fetchDocument = () => {
+        try {
+            fetch("http://127.0.0.1:8000/documents")
+                .then(res => res.json())
+                .then(data => setDocuments(data.data));
+            
+            console.log("refreshed the data");
+        } catch (err) {
+            console.log(err);
+        }
+    }
 
     useEffect(() => {
-        fetch("http://127.0.0.1:8000/documents")
-            .then(res => res.json())
-            .then(data => setDocuments(data.data));
-
-        setRefreshDocuments(false);
-        console.log("refreshed the data")
-
-    }, [refreshDocuments]);
+        console.log("first")
+        fetchDocument()
+    }, []);
 
     const handleFileChange = (e) => {
         setFiles(Array.from(e.target.files));
     };
 
     const handleUpload = async () => {
-        console.log("handle Upload - 1")
-        const formData = new FormData();
+        try {
+            setIsUploading(true);
+            console.log("handle Upload - 1")
+            const formData = new FormData();
 
-        files.forEach((file) => {
-            formData.append("files", file);
-        });
+            files.forEach((file) => {
+                formData.append("files", file);
+            });
 
-        const response = await fetch("http://127.0.0.1:8000/documents/upload", {
-            method: "POST",
-            body: formData,
-        });
+            const response = await fetch("http://127.0.0.1:8000/documents/upload", {
+                method: "POST",
+                body: formData,
+            });
 
-        const data = await response.json();
+            const data = await response.json();
 
-        setRefreshDocuments(true);
-        setFiles([])
-        // Clear the file input
-        fileInputRef.current.value = "";
+            fetchDocument();
+            setFiles([]);
+            // Clear the file input
+            fileInputRef.current.value = "";
 
-        console.log(data);
+            console.log(data);
+
+        } catch (err) {
+            console.log(err)
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const removeFile = (index) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handelDeleteFile = async (doc_id) => {
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/documents/${doc_id}`, { method: "DELETE" })
+            if (!res.ok) {
+                const errData = await res.json();
+                alert(errData.detail || "Delete failed");
+                return;
+            }
+            const data = await res.json();
+            fetchDocument();
+            alert(data.status);
+            console.log(data.status);
+            
+        } catch (error) {
+            console.log(error)
+        }
     };
 
 
@@ -71,39 +108,83 @@ function DocumentPanel() {
                 <p className="text-sm text-[#7a685d]">Add files and keep your knowledge base ready for questions.</p>
             </div>
 
-            <button
-                type="button"
-                onClick={() => { }}
-                className="mb-5 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#cdb8a0] bg-[#fcfaf8] px-4 py-7 text-center transition hover:border-[#9c7c58] hover:bg-[#f7efe7]"
-            >
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#efe2d0] text-[#7a5732]">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
-                        <path d="M12 5v14" />
-                        <path d="M5 12h14" />
-                    </svg>
-                </div>
+            <div className="rounded-2xl border border-[#e5d8c8] bg-[#fcfaf8] p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-[#2f241c]">
+                            Upload Documents
+                        </h2>
+                        <p className="text-sm text-[#8b755c]">
+                            Add PDF documents for the chatbot to answer from.
+                        </p>
+                    </div>
 
-                {/* <span className="text-sm font-semibold text-[#2f241c]">Drop files here</span> */}
-                <span className="mt-1 text-sm text-[#8b755c]">
-                    {/* or click to browse */}
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-lg border border-[#d7c7b5] px-4 py-2 text-sm font-medium text-[#5f4b3b] transition hover:bg-[#f3ebe3]"
+                    >
+                        + Add Files
+                    </button>
+
                     <input
                         ref={fileInputRef}
                         type="file"
                         multiple
                         accept=".pdf"
                         onChange={handleFileChange}
+                        className="hidden"
                     />
-                </span>
-            </button>
-            <button
-                type="submit"
-                onClick={() => handleUpload()}
-                className="rounded-xl bg-[#5f4b3b] px-4 py-2 text-sm font-semibold text-[#fef8f2] transition hover:bg-[#49392d]"
-            >
-                Upload
-            </button>
+                </div>
 
-            <div className="space-y-2">
+                {files.length > 0 ? (
+                    <>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {files.map((file, index) => (
+                                <div
+                                    key={index}
+                                    className="flex items-center justify-between rounded-lg border border-[#e7ddd1] bg-white px-4 py-3"
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <span className="text-xl">📄</span>
+
+                                        <div className="overflow-hidden">
+                                            <p className="truncate text-sm font-medium text-[#2f241c]">
+                                                {file.name}
+                                            </p>
+
+                                            <p className="text-xs text-[#8b755c]">
+                                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => removeFile(index)}
+                                        className="rounded p-2 text-[#8b755c] hover:bg-red-50 hover:text-red-600"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            disabled={isUploading}
+                            onClick={handleUpload}
+                            className="mt-5 w-full rounded-xl bg-[#5f4b3b] py-3 font-semibold text-white transition hover:bg-[#49392d]"
+                        >
+                            {isUploading ? "Uploading..." : `Upload ${files.length} Document${files.length > 1 ? "s" : ""}`}
+                        </button>
+                    </>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-[#d7c7b5] py-10 text-center text-[#8b755c]">
+                        No documents selected
+                    </div>
+                )}
+            </div>          
+
+            <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                 {documents.map((document) => (
                     <div
                         key={document.id}
@@ -118,7 +199,7 @@ function DocumentPanel() {
 
                         <button
                             type="button"
-                            onClick={() => { }}
+                            onClick={() => handelDeleteFile(document.id)}
                             className="ml-3 rounded-full p-2 text-[#8b6d4b] transition hover:bg-[#f4e7d8] hover:text-[#5f452f]"
                             aria-label={`Delete ${document.title}`}
                         >
