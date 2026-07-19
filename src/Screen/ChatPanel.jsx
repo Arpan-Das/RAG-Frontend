@@ -17,8 +17,9 @@ function ChatPanel() {
     const [messages, setMessages] = useState([]);
     const [query, setQuery] = useState("");
     
-    const [isWaitingForResponse, SetIsWaitingForResponse] = useState(false)
+    const [isWaitingForResponse, SetIsWaitingForResponse] = useState(false);
     const messagesEndRef = useRef(null);
+    const URL = import.meta.env.VITE_BACKEND_URL;
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -39,7 +40,7 @@ function ChatPanel() {
 
                 SetIsWaitingForResponse(true);
 
-                const response = await fetch("http://127.0.0.1:8000/chat", {
+                const response = await fetch(`${URL}/chat`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

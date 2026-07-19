@@ -25,10 +25,11 @@ function DocumentPanel() {
     const [files, setFiles] = useState([]);
     const fileInputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
+    const URL = import.meta.env.VITE_BACKEND_URL;
 
     const fetchDocument = () => {
         try {
-            fetch("http://127.0.0.1:8000/documents")
+            fetch(`${URL}/documents`)
                 .then(res => res.json())
                 .then(data => setDocuments(data.data));
             
@@ -57,7 +58,7 @@ function DocumentPanel() {
                 formData.append("files", file);
             });
 
-            const response = await fetch("http://127.0.0.1:8000/documents/upload", {
+            const response = await fetch(`${URL}/documents/upload`, {
                 method: "POST",
                 body: formData,
             });
@@ -84,7 +85,7 @@ function DocumentPanel() {
 
     const handelDeleteFile = async (doc_id) => {
         try {
-            const res = await fetch(`http://127.0.0.1:8000/documents/${doc_id}`, { method: "DELETE" })
+            const res = await fetch(`${URL}/documents/${doc_id}`, { method: "DELETE" })
             if (!res.ok) {
                 const errData = await res.json();
                 alert(errData.detail || "Delete failed");
